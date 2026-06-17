@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Growth Cloud 週次レポート</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#eef0f4;--card:#fff;--ink:#111827;--ink2:#374151;--ink3:#6b7280;
+  --border:#e5e7eb;--accent:#2563eb;--dark:#0f172a;
+  --green:#16a34a;--amber:#d97706;--red:#dc2626;
+}
+body{font-family:-apple-system,"Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif;background:var(--bg);min-height:100vh;color:var(--ink)}
+
+/* ── TOPBAR ── */
+.topbar{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.96);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.tl{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ttitle{font-size:14px;font-weight:700;white-space:nowrap}
+.tdate{font-size:11px;color:var(--ink3)}
+select{appearance:none;background:#f3f4f6 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b7280'/%3E%3C/svg%3E") no-repeat right 10px center;border:1.5px solid var(--border);border-radius:7px;padding:7px 30px 7px 11px;font-size:13px;font-family:inherit;cursor:pointer;min-width:200px;color:var(--ink)}
+select:focus{outline:none;border-color:var(--accent)}
+.tr{display:flex;align-items:center;gap:8px}
+.btn{display:flex;align-items:center;gap:5px;border:none;border-radius:7px;padding:8px 14px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;transition:opacity .15s,background .15s}
+.btn-import{background:#f3f4f6;color:var(--ink);border:1.5px solid var(--border)}
+.btn-import:hover{background:#e5e7eb}
+.btn-pdf{background:var(--accent);color:#fff}
+.btn-pdf:hover{background:#1d4ed8}
+.btn-pdf:disabled,.btn-import:disabled{opacity:.35;cursor:not-allowed}
+.btn-owner{background:#f3f4f6;color:var(--ink);border:1.5px solid var(--border)}
+.btn-owner:hover{background:#e5e7eb}
+.week-badge{font-size:11px;font-weight:600;color:var(--ink3);background:#f3f4f6;border:1px solid var(--border);border-radius:5px;padding:3px 8px;white-space:nowrap}
+.spin{display:inline-block;width:11px;height:11px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:sp .55s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* ── IMPORT PANEL ── */
+.import-panel{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center}
+.import-panel.open{display:flex}
+.import-box{background:#fff;border-radius:14px;padding:28px 32px;width:480px;max-width:95vw;box-shadow:0 8px 40px rgba(0,0,0,.18)}
+.import-title{font-size:16px;font-weight:700;margin-bottom:6px}
+.import-sub{font-size:12.5px;color:var(--ink3);margin-bottom:18px;line-height:1.6}
+.drop-zone{border:2px dashed var(--border);border-radius:10px;padding:32px 20px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;margin-bottom:16px}
+.drop-zone:hover,.drop-zone.dragover{border-color:var(--accent);background:#eff6ff}
+.drop-icon{font-size:32px;margin-bottom:8px}
+.drop-text{font-size:13px;color:var(--ink3)}
+.drop-text b{color:var(--accent)}
+.week-input-row{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.week-input-row label{font-size:12.5px;font-weight:600;white-space:nowrap}
+.week-input-row input[type=date]{font-family:inherit;font-size:13px;border:1.5px solid var(--border);border-radius:7px;padding:6px 10px;color:var(--ink)}
+.import-actions{display:flex;gap:8px;justify-content:flex-end}
+.btn-cancel{background:#f3f4f6;color:var(--ink);border:1.5px solid var(--border)}
+.btn-cancel:hover{background:#e5e7eb}
+.btn-confirm{background:var(--accent);color:#fff}
+.btn-confirm:hover{background:#1d4ed8}
+.btn-confirm:disabled{opacity:.4;cursor:not-allowed}
+.import-status{font-size:12px;color:var(--green);margin-bottom:8px;min-height:18px}
+.import-status.err{color:var(--red)}
+
+/* ── HISTORY STRIP ── */
+.history-strip{display:none;background:#fff;border-bottom:1px solid var(--border);padding:8px 20px;gap:6px;align-items:center;overflow-x:auto}
+.history-strip.show{display:flex}
+.hist-label{font-size:11px;color:var(--ink3);white-space:nowrap;margin-right:4px}
+.hist-chip{font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;border:1.5px solid var(--border);cursor:pointer;white-space:nowrap;background:#f9fafb;color:var(--ink3);transition:all .15s}
+.hist-chip.active{background:var(--dark);color:#fff;border-color:var(--dark)}
+.hist-chip:hover:not(.active){border-color:var(--accent);color:var(--accent)}
+.hist-del{font-size:10px;color:var(--red);cursor:pointer;padding:3px 6px;border-radius:4px;border:1px solid var(--red);margin-left:8px;background:#fff;white-space:nowrap}
+.hist-del:hover{background:#fee2e2}
+
+/* ── MAIN ── */
+.main{padding:20px;max-width:840px;margin:0 auto}
+.card{background:#fff;border-radius:12px;box-shadow:0 1px 8px rgba(0,0,0,.07);overflow:hidden;width:800px}
+
+/* ── CARD HEADER ── */
+.ch{background:var(--dark);padding:18px 22px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.dlabel{display:inline-block;font-size:9px;letter-spacing:.14em;font-weight:700;color:#60a5fa;background:rgba(96,165,250,.15);border-radius:3px;padding:2px 6px;margin-bottom:5px}
+.dn{font-size:19px;font-weight:800;color:#fff;line-height:1.2}
+.dm{font-size:11px;color:#64748b;margin-top:3px}
+.chip{flex-shrink:0;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;color:#fff;margin-top:2px;white-space:nowrap}
+
+/* ── SUMMARY ── */
+.sg{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--border)}
+.mb{padding:14px 18px;border-right:1px solid var(--border)}
+.mb:last-child{border-right:none}
+.ml{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);margin-bottom:4px}
+.mv{font-size:30px;font-weight:900;line-height:1;margin-bottom:6px}
+.mu{font-size:13px;font-weight:600}
+.bb{background:#e5e7eb;border-radius:3px;height:5px;overflow:hidden}
+.bf{height:5px;border-radius:3px}
+.mc{font-size:10px;color:var(--ink3);margin-top:4px}
+.diff-tag{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:6px;vertical-align:middle}
+.diff-up{background:#fee2e2;color:#b91c1c}
+.diff-dn{background:#dcfce7;color:#15803d}
+.diff-eq{background:#f3f4f6;color:#6b7280}
+
+/* ── WEEK COMPARE BANNER ── */
+.cmp-banner{background:#1e293b;padding:10px 18px;display:flex;gap:24px;flex-wrap:wrap;border-bottom:1px solid #334155}
+.cmp-item{display:flex;align-items:center;gap:8px}
+.cmp-label{font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em}
+.cmp-val{font-size:13px;font-weight:700;color:#fff}
+.cmp-arrow{font-size:13px}
+.arr-up{color:#f87171}
+.arr-dn{color:#4ade80}
+.arr-eq{color:#64748b}
+.cmp-streak{font-size:10px;color:#fbbf24;margin-left:4px}
+
+/* ── HEATMAP ── */
+.hm-section{background:var(--dark);padding:13px 18px}
+.hm-table-section{border-top:1px solid #1e293b;padding-top:11px}
+.hm-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.hm-title-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.hm-title{font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.07em}
+.hm-total{font-size:12px;font-weight:700}
+.hm-legend{font-size:10px;color:#64748b;display:flex;align-items:center;gap:3px}
+.lc{display:inline-block;width:15px;height:8px;border-radius:2px}
+.hm-overall-bar{background:#1e293b;border-radius:3px;height:6px;margin-bottom:10px;overflow:hidden}
+.mbar-list{display:flex;flex-direction:column;gap:5px}
+.mbar-row{display:grid;grid-template-columns:120px 1fr 44px 72px;align-items:center;gap:8px}
+.mbar-name{font-size:11px;color:#cbd5e1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mbar-track{background:#1e293b;border-radius:2px;height:5px;overflow:hidden}
+.mbar-fill{height:5px;border-radius:2px}
+.mbar-pct{font-size:11px;font-weight:700;text-align:right}
+.mbar-count{font-size:10px;color:#475569;text-align:right}
+.hm-table{width:100%;border-collapse:separate;border-spacing:2px 3px;table-layout:fixed}
+.hm-table thead th{font-size:10px;color:#94a3b8;font-weight:600;padding:0 3px 5px;text-align:center}
+.hn{width:120px;text-align:left!important;color:#cbd5e1!important;font-size:11px!important;font-weight:500!important;padding-left:0!important}
+.hth{width:44px;text-align:center!important;color:#475569!important;font-size:10px!important}
+.hlv{text-align:center}
+.hcell{padding:4px 2px;text-align:center;border-radius:4px;vertical-align:middle}
+.hcell.empty{color:#334155;font-size:10px}
+.hh{display:block;font-size:11px;font-weight:700;color:#fff;line-height:1.2}
+.hp{display:block;font-size:9px;color:rgba(255,255,255,.65);margin-top:1px}
+
+/* ── ANALYSIS ── */
+.tc{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--border)}
+.fb{padding:14px 18px}.fb.good{border-right:1px solid var(--border)}
+.bt{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--ink3);margin-bottom:7px}
+.fb ul{list-style:none;padding:0}
+.fb li{font-size:12px;line-height:1.75;padding:1px 0}
+.fb.good li{color:#15803d}.fb.conc li{color:#92400e}
+li.ok{color:var(--green)!important}
+
+/* ── COMMENT / ACTION ── */
+.cb{padding:14px 18px;border-bottom:1px solid var(--border);background:#f9fafb}
+.cb p{font-size:12px;line-height:1.85;color:#1f2937;margin-bottom:7px}
+.cb p:last-child{margin-bottom:0}
+.cb .diff-note{background:#eff6ff;border-left:3px solid var(--accent);padding:6px 10px;border-radius:0 6px 6px 0;margin-bottom:7px;font-size:12px;line-height:1.7;color:#1e40af}
+.cb .diff-note.imp{background:#f0fdf4;border-color:var(--green);color:#14532d}
+.cb .diff-note.det{background:#fff7ed;border-color:var(--amber);color:#92400e}
+.cb .diff-note.cont{background:#fef9c3;border-color:#ca8a04;color:#713f12}
+.ab{padding:14px 18px}.ab ol{padding-left:16px}
+.ab li{font-size:12px;font-weight:600;color:var(--accent);line-height:1.75}
+
+/* ── EMPTY STATE ── */
+.empty{text-align:center;padding:60px 20px;color:var(--ink3)}
+.empty .ico{font-size:40px;margin-bottom:10px}.empty p{font-size:14px}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#111827;color:#fff;font-size:13px;font-weight:600;padding:10px 20px;border-radius:30px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:999}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="tl">
+    <div><div class="ttitle">📊 Growth Cloud 週次レポート</div><div class="tdate" id="topDate">—</div></div>
+    <select id="sel" onchange="showDept(this.value)">
+      <option value="">— 部署を選択 —</option>
+    </select>
+  </div>
+  <div class="tr">
+    <button class="btn btn-owner" id="ownerBtn" onclick="toggleOwnerLogin()" title="オーナーログイン">🔒 オーナー</button>
+    <span class="week-badge" id="weekBadge" style="display:none"></span>
+    <button class="btn btn-import" id="importBtn" onclick="checkOwnerThenImport()" style="display:none">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      CSVインポート
+    </button>
+    <div class="dl-group" id="dlGroup" style="display:flex;gap:0">
+      <button class="btn btn-pdf" id="pdfBtn" disabled onclick="dlPDF()" style="border-radius:7px 0 0 7px;border-right:1px solid rgba(255,255,255,.25)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        PDF
+      </button>
+      <button class="btn btn-pdf" id="jpegBtn" disabled onclick="dlJPEG()" style="border-radius:0 7px 7px 0">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        JPEG
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- History strip -->
+<div class="history-strip" id="histStrip">
+  <span class="hist-label">週履歴：</span>
+  <div id="histChips"></div>
+  <button class="hist-del" id="delBtn" onclick="deleteCurrentWeek()" style="display:none">この週を削除</button>
+</div>
+
+<!-- Owner login panel -->
+<div class="import-panel" id="ownerPanel">
+  <div class="import-box" style="max-width:360px">
+    <div class="import-title">🔒 オーナーログイン</div>
+    <div class="import-sub">オーナー（櫻井）のみCSVインポート・削除が可能です。</div>
+    <input type="password" id="ownerPw" placeholder="パスワードを入力" style="width:100%;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:7px;font-size:13px;font-family:inherit;margin-bottom:12px">
+    <div class="import-status" id="ownerStatus"></div>
+    <div class="import-actions">
+      <button class="btn btn-cancel" onclick="closeOwnerPanel()">キャンセル</button>
+      <button class="btn btn-confirm" onclick="doOwnerLogin()">ログイン</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import panel -->
+<div class="import-panel" id="importPanel">
+  <div class="import-box">
+    <div class="import-title">📥 CSVインポート</div>
+    <div class="import-sub">Growth Cloud のRowデータCSVをインポートします。<br>同じ週のデータを再インポートすると上書きされます。</div>
+    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+      <div class="drop-icon">📂</div>
+      <div class="drop-text"><b>クリックまたはドラッグ</b>してCSVを選択</div>
+    </div>
+    <input type="file" id="fileInput" accept=".csv" style="display:none" onchange="handleFile(this.files[0])">
+    <div class="week-input-row">
+      <label>週（月曜日）：</label>
+      <input type="date" id="weekDate">
+    </div>
+    <div class="import-status" id="importStatus"></div>
+    <div class="import-actions">
+      <button class="btn btn-cancel" onclick="closeImport()">キャンセル</button>
+      <button class="btn btn-confirm" id="confirmBtn" disabled onclick="confirmImport()">インポート実行</button>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  <div id="wrap">
+    <div class="empty"><div class="ico">📥</div><p>右上の「CSVインポート」からデータを読み込んでください</p></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════════════════
+// DEFINITIONS
+// ════════════════════════════════════════
+const EFF_DEF = {
+  5:'全社・経営全体に直接影響するタスク',
+  4:'個々のPJではなく全体に直接影響するタスク',
+  3:'PJの成果に直結するタスク',
+  2:'PJの成果に直結しないタスク（PJの推進のために行うタスク）',
+  1:'プロジェクトに影響しないタスク'
+};
+const DIFF_DEF = {
+  5:'事業・組織として何に取り組むべきかの設定から始まるタスク',
+  4:'達成目標は決まっているが実現方法を自分で設計するタスク',
+  3:'やり方がなく最適な方法・手段を自分で判断して選ぶタスク',
+  2:'手順書や過去の例を使えば誰でも同じ品質で仕上げられるタスク',
+  1:'マニュアル通りに実行すれば終わるタスク'
+};
+const CTO_SUBS = ['CTO室','CTO室\u3000AIグループ','CTO室\u3000エンジニア本部','CTO室\u3000デザイン本部','CTO室\u3000プロダクト本部'];
+
+// ════════════════════════════════════════
+// SUPABASE CONFIG  ★ここに自分のキーを入れる
+// ════════════════════════════════════════
+const SUPABASE_URL      = 'https://fjynuqfkkruckwhozzuw.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_10anUIFZ7NpPZYMX9glSdA_sjls8rEj';
+const SUPABASE_SECRET   = 'sb_secret_MJzDGnYIsVs_lYo1m3xRXw_Ra0oyDDn';
+const OWNER_PASSWORD    = 'B.sakurai_wein12';
+
+// ── 認証状態 ──
+let isOwner = false;
+
+function sbHeaders(write=false) {
+  const h = {
+    'Content-Type': 'application/json',
+    'apikey': SUPABASE_ANON_KEY,
+    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+  };
+  if (write) h['Prefer'] = 'resolution=merge-duplicates';
+  return h;
+}
+
+async function dbGetAll() {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/weekly_reports?select=week_key,results_json,imported_at&order=week_key.desc`, {
+    headers: sbHeaders(false)
+  });
+  if (!res.ok) throw new Error('データ取得失敗: ' + await res.text());
+  const rows = await res.json();
+  return rows.map(r => ({
+    weekKey: r.week_key,
+    results: JSON.parse(r.results_json),
+    importedAt: r.imported_at,
+  }));
+}
+
+async function dbPut(obj) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/weekly_reports`, {
+    method: 'POST',
+    headers: sbHeaders(true),
+    body: JSON.stringify({
+      week_key: obj.weekKey,
+      results_json: JSON.stringify(obj.results),
+      imported_at: obj.importedAt,
+      imported_by: 'sakurai',
+    })
+  });
+  if (!res.ok) throw new Error('保存失敗: ' + await res.text());
+}
+
+async function dbDelete(key) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/weekly_reports?week_key=eq.${encodeURIComponent(key)}`, {
+    method: 'DELETE',
+    headers: sbHeaders(true)
+  });
+  if (!res.ok) throw new Error('削除失敗: ' + await res.text());
+}
+
+function openDB() { return Promise.resolve(); }
+
+// ════════════════════════════════════════
+// CSV PARSING
+// ════════════════════════════════════════
+let pendingRows = null, pendingWeekKey = null;
+
+function parseCSV(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) return [];
+  const raw = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g,''));
+  const map = {};
+  const aliases = {
+    department:['department','部門名','部署名'],
+    employee_name:['employee_name','氏名','名前'],
+    effectiveness:['effectiveness','効果度'],
+    difficulty:['difficulty','難易度'],
+    estimate_minutes:['estimate_minutes','見積分','見積もり時間'],
+    status:['status','ステータス'],
+    task_name:['task_name','タスク名']
+  };
+  raw.forEach((h,i) => {
+    for (const [k,v] of Object.entries(aliases)) {
+      if (v.some(a => h.toLowerCase().includes(a.toLowerCase()))) map[k] = i;
+    }
+  });
+  if (map.department === undefined || map.employee_name === undefined) return null;
+  return lines.slice(1).map(l => {
+    const c = l.split(',').map(x => x.trim().replace(/^"|"$/g,''));
+    const dept = c[map.department] || '';
+    return {
+      department: CTO_SUBS.includes(dept) ? 'CTO室（全体）' : dept,
+      employee_name: c[map.employee_name] || '',
+      effectiveness: map.effectiveness !== undefined ? parseFloat(c[map.effectiveness]) : NaN,
+      difficulty: map.difficulty !== undefined ? parseFloat(c[map.difficulty]) : NaN,
+      estimate_minutes: map.estimate_minutes !== undefined ? parseFloat(c[map.estimate_minutes]) || 0 : 0,
+    };
+  }).filter(r => r.department && r.employee_name);
+}
+
+// ════════════════════════════════════════
+// ANALYSIS
+// ════════════════════════════════════════
+function lastName(full) {
+  if (!full) return full;
+  // スペース・全角スペースで分割できる場合はそれを使う
+  const s = full.split(/[\s\u3000]+/);
+  if (s.length >= 2) return s[0];
+  // 既知の3文字姓
+  const three = ['渡嘉敷','勅使河原','左近司'];
+  for (const t of three) { if (full.startsWith(t)) return t; }
+  // それ以外はスペースなし4文字以上 → 先頭2文字を苗字とする
+  if (full.length >= 3) return full.slice(0, 2);
+  return full;
+}
+
+function analyzeRows(rows) {
+  const byDept = {};
+  rows.forEach(r => {
+    if (!byDept[r.department]) byDept[r.department] = [];
+    byDept[r.department].push(r);
+  });
+  const results = {};
+  for (const [dept, group] of Object.entries(byDept)) {
+    results[dept] = analyzeDept(group);
+  }
+  return results;
+}
+
+function analyzeDept(group) {
+  const total = group.length;
+  const filled = group.filter(r => !isNaN(r.effectiveness) && !isNaN(r.difficulty)).length;
+  const ir = total ? filled/total*100 : 0;
+  const fd = group.filter(r => !isNaN(r.effectiveness) && !isNaN(r.difficulty));
+  const ep  = filled ? fd.filter(r => r.effectiveness >= 4).length/filled*100 : 0;
+  const dp  = filled ? fd.filter(r => r.difficulty   >= 4).length/filled*100 : 0;
+  const e23 = filled ? fd.filter(r => r.effectiveness===2||r.effectiveness===3).length/filled*100 : 0;
+  const d23 = filled ? fd.filter(r => r.difficulty===2||r.difficulty===3).length/filled*100 : 0;
+  const e1  = filled ? fd.filter(r => r.effectiveness===1).length/filled*100 : 0;
+  const d1  = filled ? fd.filter(r => r.difficulty===1).length/filled*100 : 0;
+
+  // per-member
+  const byMember = {};
+  group.forEach(r => {
+    if (!byMember[r.employee_name]) byMember[r.employee_name] = [];
+    byMember[r.employee_name].push(r);
+  });
+
+  const low = Object.entries(byMember)
+    .map(([n,g]) => [n, Math.round(g.filter(r=>!isNaN(r.effectiveness)&&!isNaN(r.difficulty)).length/g.length*100)])
+    .filter(([,v]) => v < 100);
+
+  // 個人偏重（効果度・難易度 共通）
+  const meff = {}, mdiff = {};
+  for (const [n,g] of Object.entries(byMember)) {
+    const f = g.filter(r=>!isNaN(r.effectiveness)&&!isNaN(r.difficulty));
+    if (f.length) {
+      meff[n]  = Math.round(f.filter(r=>r.effectiveness>=4).length/f.length*100);
+      mdiff[n] = Math.round(f.filter(r=>r.difficulty>=4).length/f.length*100);
+    }
+  }
+  const avgEff  = Object.values(meff).length  ? Object.values(meff).reduce((a,b)=>a+b,0)/Object.values(meff).length   : 0;
+  const avgDiff = Object.values(mdiff).length ? Object.values(mdiff).reduce((a,b)=>a+b,0)/Object.values(mdiff).length : 0;
+  const bep  = Object.entries(meff).filter(([,v])  => v > avgEff+20);
+  const bdp  = Object.entries(mdiff).filter(([,v]) => v > avgDiff+20);
+
+  const hb = fd.filter(r => r.effectiveness>=4 && r.difficulty>=4);
+  const hbByMember = {};
+  hb.forEach(r => { hbByMember[r.employee_name] = (hbByMember[r.employee_name]||0)+1; });
+  const hbt = hb.length;
+  const attr = Object.entries(hbByMember).filter(([,c]) => hbt && c/hbt>=0.5);
+
+  // dist bias（効果度・難易度）
+  const distBiased = [];
+  for (const [n,g] of Object.entries(byMember)) {
+    const f = g.filter(r=>!isNaN(r.effectiveness)&&!isNaN(r.difficulty));
+    if (f.length < 3) continue;
+    // 効果度
+    const edist = {};
+    for (let lv=1;lv<=5;lv++) edist[lv] = f.filter(r=>r.effectiveness===lv).length/f.length*100;
+    let found = false;
+    for (let lv=1;lv<=5;lv++) {
+      if (edist[lv]>=80) { distBiased.push([n,[lv,Math.round(edist[lv]),'単独'],'eff']); found=true; break; }
+    }
+    if (!found) {
+      for (const [l1,l2] of [[1,2],[1,3],[1,4],[1,5],[2,3],[2,4],[2,5],[3,4],[3,5],[4,5]]) {
+        const tot = edist[l1]+edist[l2];
+        const restMax = Math.max(...[1,2,3,4,5].filter(l=>l!==l1&&l!==l2).map(l=>edist[l]));
+        if (tot>=90 && restMax<=5) { distBiased.push([n,[[l1,l2],Math.round(tot),'2段階'],'eff']); break; }
+      }
+    }
+    // 難易度
+    const ddist = {};
+    for (let lv=1;lv<=5;lv++) ddist[lv] = f.filter(r=>r.difficulty===lv).length/f.length*100;
+    let dfound = false;
+    for (let lv=1;lv<=5;lv++) {
+      if (ddist[lv]>=80) { distBiased.push([n,[lv,Math.round(ddist[lv]),'単独'],'diff']); dfound=true; break; }
+    }
+    if (!dfound) {
+      for (const [l1,l2] of [[1,2],[1,3],[1,4],[1,5],[2,3],[2,4],[2,5],[3,4],[3,5],[4,5]]) {
+        const tot = ddist[l1]+ddist[l2];
+        const restMax = Math.max(...[1,2,3,4,5].filter(l=>l!==l1&&l!==l2).map(l=>ddist[l]));
+        if (tot>=90 && restMax<=5) { distBiased.push([n,[[l1,l2],Math.round(tot),'2段階'],'diff']); break; }
+      }
+    }
+  }
+
+  // 脳死チェック：効果度・難易度それぞれで1が50%以上 or 2・3が95%以上固定
+  const braindead = [];
+  for (const [n,g] of Object.entries(byMember)) {
+    const f = g.filter(r=>!isNaN(r.effectiveness)&&!isNaN(r.difficulty));
+    if (f.length < 3) continue;
+    // 効果度
+    const e1p = f.filter(r=>r.effectiveness===1).length/f.length*100;
+    const e23p = f.filter(r=>r.effectiveness===2||r.effectiveness===3).length/f.length*100;
+    if (e1p >= 50) braindead.push([n, Math.round(e1p), '1偏重', 'eff']);
+    else if (e23p >= 95) braindead.push([n, Math.round(e23p), '23固定', 'eff']);
+    // 難易度
+    const d1p = f.filter(r=>r.difficulty===1).length/f.length*100;
+    const d23p = f.filter(r=>r.difficulty===2||r.difficulty===3).length/f.length*100;
+    if (d1p >= 50) braindead.push([n, Math.round(d1p), '1偏重', 'diff']);
+    else if (d23p >= 95) braindead.push([n, Math.round(d23p), '23固定', 'diff']);
+  }
+
+  const issues = (ir<100?2:0)
+    + (ep>20?1:0)
+    + (dp>20?1:0)
+    + (e1>=50?2:0)
+    + (d1>=50?2:0)
+    + (bep.length?1:0)
+    + (bdp.length?1:0)
+    + (attr.length?1:0)
+    + (distBiased.length?1:0)
+    + (braindead.length?1:0);
+  const ov = issues===0?['🟢','良好','#16a34a']:issues<=2?['🟡','要改善','#d97706']:['🔴','改善優先','#dc2626'];
+
+  // per-member full data
+  const members = Object.entries(byMember).map(([name,g]) => {
+    const mf = g.filter(r=>!isNaN(r.effectiveness)&&!isNaN(r.difficulty));
+    const mIr = Math.round(mf.length/g.length*100*10)/10;
+    const totalH = Math.round(g.reduce((s,r)=>s+r.estimate_minutes,0)/60);
+    const effDist = {};
+    for (let lv=1;lv<=5;lv++) {
+      const cnt = mf.filter(r=>r.effectiveness===lv).length;
+      const h = Math.round(g.filter(r=>r.effectiveness===lv).reduce((s,r)=>s+r.estimate_minutes,0)/60);
+      const pct = mf.length ? Math.round(cnt/mf.length*100) : 0;
+      effDist[lv] = {cnt,h,pct};
+    }
+    return {name, total:g.length, filled:mf.length, ir:mIr, totalH, effDist};
+  });
+
+  return {total,filled,ir:Math.round(ir*10)/10,ep:Math.round(ep*10)/10,dp:Math.round(dp*10)/10,
+          e23:Math.round(e23*10)/10,d23:Math.round(d23*10)/10,e1:Math.round(e1*10)/10,d1:Math.round(d1*10)/10,
+          low,meff,mdiff,avgEff:Math.round(avgEff),avgDiff:Math.round(avgDiff),bep,bdp,hbt,attr,distBiased,braindead,ov,members};
+}
+
+// ════════════════════════════════════════
+// DIFF ANALYSIS
+// ════════════════════════════════════════
+function calcDiff(curr, prev) {
+  if (!prev) return null;
+  return {
+    ir:  {val: Math.round((curr.ir  - prev.ir )*10)/10},
+    ep:  {val: Math.round((curr.ep  - prev.ep )*10)/10},
+    dp:  {val: Math.round((curr.dp  - prev.dp )*10)/10},
+    e23: {val: Math.round((curr.e23 - prev.e23)*10)/10},
+    d23: {val: Math.round((curr.d23 - prev.d23)*10)/10},
+    e1:  {val: Math.round((curr.e1  - prev.e1 )*10)/10},
+  };
+}
+
+// Count consecutive weeks with same issue (from sorted weeks array, newest first)
+function countStreak(weeks, deptKey, issueKey, currentWeekIdx) {
+  let streak = 1;
+  for (let i = currentWeekIdx+1; i < weeks.length; i++) {
+    const w = weeks[i];
+    if (!w.results[deptKey]) break;
+    const r = w.results[deptKey];
+    if (issueKey === 'ir' && r.ir < 100) streak++;
+    else if (issueKey === 'ep' && r.ep > 20) streak++;
+    else if (issueKey === 'dp' && r.dp > 20) streak++;
+    else if (issueKey === 'distBiased' && r.distBiased.length > 0) streak++;
+    else if (issueKey === 'e1' && r.e1 >= 50) streak++;
+    else if (issueKey === 'braindead' && r.braindead && r.braindead.length > 0) streak++;
+    else break;
+  }
+  return streak;
+}
+
+// ════════════════════════════════════════
+// COMMENT BUILDERS
+// ════════════════════════════════════════
+function ln(full) { return lastName(full); }
+function namePlural(persons) {
+  return persons.length<=3 ? persons.map(([n])=>`${ln(n)}さん`).join('、') : `複数名（${persons.length}名）`;
+}
+
+function buildGood(r) {
+  const p = [];
+  if (r.ir===100) p.push('入力率100%達成 — 全員が評価できています');
+  if (r.ep<=20) p.push(`効果度4・5が適正範囲（${r.ep}%）`);
+  if (r.dp<=20) p.push(`難易度4・5が適正範囲（${r.dp}%）`);
+  if (r.e1<50 && r.e23>=60) p.push(`効果度2・3が${r.e23}%と適正範囲`);
+  if (r.d1<50 && r.d23>=60) p.push(`難易度2・3が${r.d23}%と適正範囲`);
+  if (!r.attr.length && r.hbt>0) p.push('高効果×高難易度タスクが分散 — 特定メンバーへの評価集中なし');
+  if (!r.distBiased.length && !r.braindead.length) p.push('評価分布に極端な偏りなし — 5段階を使い分けられています');
+  return p.length ? p : ['データが揃っており分析可能な状態です'];
+}
+
+function buildConcern(r, diff=null) {
+  const p = [];
+  if (r.ir<100) {
+    p.push(`入力率 ${r.ir}%（未達）`);
+    r.low.slice(0,3).forEach(([n,v]) => p.push(`&nbsp;&nbsp;└ ${ln(n)}さん（${v}%）`));
+  }
+  if (r.e1>=50) p.push(`効果度1が ${r.e1}% — 脳死入力の可能性（1は「PJに影響しないタスク」）`);
+  if (r.d1>=50) p.push(`難易度1が ${r.d1}% — 脳死入力の可能性（1は「マニュアル通りに実行すれば終わるタスク」）`);
+  if (r.ep>20) p.push(`効果度4・5が ${r.ep}%（基準：20%以下）— 評価基準がズレている可能性`);
+  if (r.dp>20) p.push(`難易度4・5が ${r.dp}%（基準：20%以下）— 評価基準がズレている可能性`);
+  // braindead: 同じ人が効果度・難易度両方に該当する場合はまとめる
+  if (r.braindead.length) {
+    const bdMap = {};
+    r.braindead.forEach(([n,pct,type,axis]) => {
+      if (type==='23固定' && !diff) return; // 前週データなし時は固定化チェックしない
+      if (!bdMap[n]) bdMap[n] = [];
+      const axisLabel = axis==='eff'?'効果度':'難易度';
+      bdMap[n].push(type==='1偏重'?`${axisLabel}1が${pct}%`:`${axisLabel}2・3が${pct}%固定`);
+    });
+    const names = Object.keys(bdMap).filter(n=>bdMap[n].length>0);
+    if (names.length>0 && names.length<=3) {
+      names.forEach(n => p.push(`${ln(n)}さん：${bdMap[n].join('・')} — 脳死入力または固定化の可能性`));
+    } else if (names.length>3) {
+      p.push(`評価が固定化している可能性のあるメンバーが${names.length}名`);
+    }
+  }
+  // distBiased: 同じ人が効果度・難易度両方に該当する場合はまとめる
+  if (r.distBiased.length) {
+    const dbMap = {};
+    r.distBiased.forEach(([n,[kind,pct,typ],axis]) => {
+      if (!dbMap[n]) dbMap[n] = [];
+      const axisLabel = axis==='eff'?'効果度':'難易度';
+      dbMap[n].push(typ==='単独'?`${axisLabel}${kind}に${pct}%集中`:`${axisLabel}${kind[0]}・${kind[1]}に${pct}%集中`);
+    });
+    const names = Object.keys(dbMap);
+    if (names.length<=3) {
+      names.forEach(n => p.push(`${ln(n)}さん：${dbMap[n].join('・')} — 評価基準のズレの可能性`));
+    } else {
+      p.push(`評価分布が特定段階に偏っているメンバーが${names.length}名`);
+    }
+  }
+  // 個人偏重: 効果度・難易度両方に該当する場合はまとめる
+  {
+    const bepNames = new Set(r.bep.map(([n])=>n));
+    const bdpNames = new Set(r.bdp.map(([n])=>n));
+    const both = [...bepNames].filter(n=>bdpNames.has(n));
+    const effOnly = [...bepNames].filter(n=>!bdpNames.has(n));
+    const diffOnly = [...bdpNames].filter(n=>!bepNames.has(n));
+    if (both.length) p.push(`${both.length<=3?both.map(n=>`${ln(n)}さん`).join('、'):`複数名（${both.length}名）`}の効果度・難易度ともに高評価率がチーム平均より高い状態`);
+    if (effOnly.length) p.push(`${effOnly.length<=3?effOnly.map(n=>`${ln(n)}さん`).join('、'):`複数名（${effOnly.length}名）`}の効果度高評価率がチーム平均より高い状態`);
+    if (diffOnly.length) p.push(`${diffOnly.length<=3?diffOnly.map(n=>`${ln(n)}さん`).join('、'):`複数名（${diffOnly.length}名）`}の難易度高評価率がチーム平均より高い状態`);
+  }
+  r.attr.slice(0,1).forEach(([n,c]) => p.push(`${ln(n)}さんに高効果×高難易度が集中（${c}/${r.hbt}件）`));
+  return p;
+}
+
+function buildComment(r, diff, streaks) {
+  const ls = [];
+
+  // 入力率
+  if (r.ir<100) {
+    const ns = r.low.slice(0,3).map(([n,v])=>`${ln(n)}さん（${v}%）`).join('、');
+    ls.push(`入力率が${r.ir}%でした。${ns}が未入力です。まずは入力を依頼してみてください。`);
+  }
+
+  // 脳死チェック（部署全体）
+  if (r.e1>=50) ls.push(`効果度1が${r.e1}%と高い状態です。効果度1は「PJに影響しないタスク」を指しますが、本当にそれだけ該当するタスクがあるか確認してみてください。`);
+  if (r.d1>=50) ls.push(`難易度1が${r.d1}%と高い状態です。本当にそれだけ該当するタスクがあるか確認してみてください。`);
+  if (r.braindead.length) {
+    const bdMap = {};
+    r.braindead.forEach(([n,pct,type,axis]) => {
+      // 「23固定」は前週データがある場合のみ（初回は変動確認不可）
+      if (type==='23固定' && !diff) return;
+      if (!bdMap[n]) bdMap[n] = [];
+      const axisLabel = axis==='eff'?'効果度':'難易度';
+      bdMap[n].push(type==='1偏重'?`${axisLabel}1が${pct}%`:`${axisLabel}2・3が${pct}%固定`);
+    });
+    Object.entries(bdMap).slice(0,3).forEach(([n,items]) => {
+      if (!items.length) return;
+      const both = items.length >= 2;
+      const prefix = both ? '効果度・難易度ともに' : '';
+      ls.push(`${ln(n)}さんの${both?prefix+items.map(s=>s.replace(/^(効果度|難易度)/,'')).join('・'):items.join('、')}です。本当にそれだけ該当するタスクがあるか確認してみてください。`);
+    });
+  }
+
+  // 前週差分ノート
+  if (diff) {
+    const notes = [];
+    const irD = diff.ir.val, epD = diff.ep.val, dpD = diff.dp.val;
+    if (Math.abs(irD)>=3) notes.push({type: irD>0?'imp':'det', text:`入力率が先週比${irD>0?'+':''}${irD}%（${irD>0?'改善':'悪化'}）しました。`});
+    if (Math.abs(epD)>=3) notes.push({type: epD<0?'imp':'det', text:`効果度4・5割合が先週比${epD>0?'+':''}${epD}%${epD>0?'上昇しています。評価の偏りが強まっています。':'低下しています。評価が適正化されています。'}`});
+    if (Math.abs(dpD)>=3) notes.push({type: dpD<0?'imp':'det', text:`難易度4・5割合が先週比${dpD>0?'+':''}${dpD}%${dpD>0?'上昇しています。':'低下しています。'}`});
+    // 2・3割合の変動チェック（脳死入力検知）
+    if (diff.e23) {
+      const e23D = diff.e23.val;
+      if (Math.abs(e23D) < 2 && r.e23 >= 60) notes.push({type:'cont', text:`効果度2・3の割合が先週とほぼ変わらず${r.e23}%です。毎週同じ割合が続いている場合、評価が固定化していないか確認してみてください。`});
+    }
+    if (diff.d23) {
+      const d23D = diff.d23.val;
+      if (Math.abs(d23D) < 2 && r.d23 >= 60) notes.push({type:'cont', text:`難易度2・3の割合が先週とほぼ変わらず${r.d23}%です。毎週同じ割合が続いている場合、評価が固定化していないか確認してみてください。`});
+    }
+    if (notes.length) ls.push({diffNotes: notes});
+  }
+
+  // 継続課題
+  if (streaks) {
+    if (streaks.ir > 1) ls.push({streak: `入力率未達が${streaks.ir}週連続です。入力習慣の定着を優先してください。`});
+    if (streaks.ep > 1) ls.push({streak: `効果度の高評価偏重が${streaks.ep}週連続です。朝・夕会や月曜日のGrowth Cloud確認MTGで一度取り上げてみてください。`});
+    if (streaks.dp > 1) ls.push({streak: `難易度の高評価偏重が${streaks.dp}週連続です。朝・夕会や月曜日のGrowth Cloud確認MTGで一度取り上げてみてください。`});
+    if (streaks.dist > 1) ls.push({streak: `評価分布の偏りが${streaks.dist}週連続で確認されています。朝・夕会や月曜日のGrowth Cloud確認MTGで取り上げてみてください。`});
+    if (streaks.e1 > 1) ls.push({streak: `効果度1が高い状態が${streaks.e1}週連続です。脳死入力になっていないか確認してみてください。`});
+    if (streaks.braindead > 1) ls.push({streak: `評価の固定化が${streaks.braindead}週連続で見られます。朝・夕会や月曜日のGrowth Cloud確認MTGで取り上げてみてください。`});
+  }
+
+  // 分布偏重
+  if (r.distBiased.length) {
+    const dbMap = {};
+    r.distBiased.forEach(([n,[kind,pct,typ],axis]) => {
+      if (!dbMap[n]) dbMap[n] = [];
+      const axisLabel = axis==='eff'?'効果度':'難易度';
+      dbMap[n].push(typ==='単独'?`${axisLabel}${kind}に${pct}%集中`:`${axisLabel}${kind[0]}・${kind[1]}に${pct}%集中`);
+    });
+    const names = Object.keys(dbMap);
+    if (names.length<=3) {
+      const lines = names.map(n => {
+        const items = dbMap[n];
+        const prefix = items.length>=2 ? '効果度・難易度ともに' : '';
+        return `${ln(n)}さんは${prefix}${items.length>=2?items.map(s=>s.replace(/^(効果度|難易度)/,'')).join('・'):items[0]}`;
+      });
+      ls.push(lines.join('。') + '。評価基準が固定化している可能性があります。本当にそう評価できているか確認してみてください。');
+    } else {
+      const sample = names.slice(0,3).map(n=>`${ln(n)}さん`).join('、');
+      ls.push(`評価分布が特定段階に偏っているメンバーが${names.length}名います（${sample} ほか）。朝・夕会や月曜日のGrowth Cloud確認MTGで各段階の認識をすり合わせてみてください。`);
+    }
+  }
+
+  // 効果度高偏重
+  if (r.ep>20) ls.push(`効果度4・5が${r.ep}%と基準（20%以下）を超えています。本当に全社・事業全体に影響するタスクがこれだけあるか確認してみてください。基準が揃っているなら業務設計の問題として捉えてください。`);
+
+  // 難易度高偏重
+  if (r.dp>20) ls.push(`難易度4・5が${r.dp}%と基準（20%以下）を超えています。評価基準がメンバー間でズレていないか確認してみてください。`);
+
+  // 個人偏重
+  // 個人偏重: 効果度・難易度両方に該当する人はまとめる
+  {
+    const bepMap = Object.fromEntries(r.bep);
+    const bdpMap = Object.fromEntries(r.bdp);
+    const allNames = [...new Set([...r.bep.map(([n])=>n),...r.bdp.map(([n])=>n)])];
+    const both = allNames.filter(n=>bepMap[n]!==undefined&&bdpMap[n]!==undefined);
+    const effOnly = allNames.filter(n=>bepMap[n]!==undefined&&bdpMap[n]===undefined);
+    const diffOnly = allNames.filter(n=>bepMap[n]===undefined&&bdpMap[n]!==undefined);
+    const totalCnt = allNames.length;
+    if (totalCnt > 0) {
+      if (totalCnt <= 3) {
+        const parts = [];
+        if (both.length) parts.push(`${both.map(n=>`${ln(n)}さん`).join('、')}は効果度・難易度ともに高評価率がチーム平均より高い状態です`);
+        if (effOnly.length) parts.push(`${effOnly.map(n=>`${ln(n)}さん`).join('、')}は効果度高評価率がチーム平均より高い状態です`);
+        if (diffOnly.length) parts.push(`${diffOnly.map(n=>`${ln(n)}さん`).join('、')}は難易度高評価率がチーム平均より高い状態です`);
+        ls.push(parts.join('。') + '。評価基準にズレがないか確認するのが先決です。基準が揃っているなら業務配分の問題として捉えてください。');
+      } else {
+        const s = allNames.slice(0,3).map(n=>`${ln(n)}さん`).join('、');
+        ls.push(`効果度・難易度の高評価率がチーム平均より高いメンバーが${totalCnt}名います（${s} ほか）。朝・夕会や月曜日のGrowth Cloud確認MTGで評価基準をそろえてみてください。`);
+      }
+    }
+  }
+
+  // 属人化
+  r.attr.slice(0,1).forEach(([n,c]) => {
+    ls.push(`${ln(n)}さんに高効果×高難易度タスクが${c}件集中しています（全体${r.hbt}件）。評価基準が他メンバーと揃っているか確認するのが先決です。揃っているなら業務負荷・移管・育成の観点で対処を検討してください。`);
+  });
+
+  return ls.length ? ls : ['今週は数値上の異常なしです。評価基準が正しく共有できている状態が続いています。'];
+}
+
+function buildActions(r, streaks) {
+  const a = [];
+
+  // 苗字スラッシュ区切りのサフィックス
+  function ns(names) {
+    if (!names||!names.length) return '';
+    const lns = names.map(n=>ln(n));
+    return lns.length<=6 ? `（${lns.join(' / ')}）` : `（${lns.slice(0,5).join(' / ')} ほか）`;
+  }
+
+  // 未入力メンバー
+  if (r.ir<100) {
+    a.push(`未入力メンバーに入力を依頼する${ns(r.low.map(([n])=>n))}`);
+  }
+
+  // 評価基準確認が必要な全メンバーを集約（distBiased / braindead / bep / bdp）
+  const checkNames = [...new Set([
+    ...r.distBiased.map(([n])=>n),
+    ...r.braindead.map(([n])=>n),
+    ...r.bep.map(([n])=>n),
+    ...r.bdp.map(([n])=>n),
+  ])];
+  if (checkNames.length > 0) {
+    if (checkNames.length<=3) a.push(`${checkNames.map(n=>`${ln(n)}さん`).join('、')}と効果度・難易度の評価基準を確認する`);
+    else a.push(`効果度・難易度の評価基準を確認する${ns(checkNames)}`);
+  }
+
+  // 4・5割合が基準（20%）超えのメンバー
+  if (r.ep>20) {
+    const epNames = Object.entries(r.meff||{}).filter(([,v])=>v>20).map(([n])=>n);
+    a.push(`効果度4・5が基準を超えているメンバーに評価基準を確認する${ns(epNames)}`);
+  }
+  if (r.dp>20) {
+    const dpNames = Object.entries(r.mdiff||{}).filter(([,v])=>v>20).map(([n])=>n);
+    a.push(`難易度4・5が基準を超えているメンバーに評価基準を確認する${ns(dpNames)}`);
+  }
+
+  // 1割合高偏重（部署全体）
+  if (r.e1>=50||r.d1>=50) {
+    a.push('効果度・難易度1が高い状態のため、評価内容を確認する');
+  }
+
+  if (r.attr.length) a.push(`${ln(r.attr[0][0])}さんの評価基準が他メンバーと揃っているかヒアリングする`);
+  if (streaks && (streaks.ir>2||streaks.ep>2||streaks.dp>2)) {
+    a.push('朝・夕会や月曜日のGrowth Cloud確認MTGで継続課題を共有する');
+  }
+  return a.length ? a : ['現状維持。評価基準の共有状態を継続モニタリング'];
+}
+
+// ════════════════════════════════════════
+// RENDER
+// ════════════════════════════════════════
+function pc(v,t=20){return v>t?'#dc2626':'#16a34a';}
+function ic(v){return v===100?'#16a34a':v>=80?'#d97706':'#dc2626';}
+
+function effCell(d) {
+  if (!d.cnt) return `<td class="hcell empty">—</td>`;
+  const alpha = Math.min(d.pct/100*1.4,1).toFixed(2);
+  return `<td class="hcell" style="background:rgba(230,80,30,${alpha})"><span class="hh">${d.h}h</span><span class="hp">${d.pct}%</span></td>`;
+}
+
+function diffTag(val, reverseGood=false) {
+  if (Math.abs(val) < 1) return `<span class="diff-tag diff-eq">±0</span>`;
+  const isGood = reverseGood ? val < 0 : val > 0;
+  const cls = isGood ? 'diff-dn' : 'diff-up';
+  return `<span class="diff-tag ${cls}">${val>0?'+':''}${val}%</span>`;
+}
+
+function renderCmpBanner(r, prev, diff, weeks, deptKey, weekIdx) {
+  if (!diff && !prev) return '';
+  const items = [];
+
+  const irStreakN = r.ir<100 ? countStreak(weeks,deptKey,'ir',weekIdx) : 0;
+  const epStreakN = r.ep>50 ? countStreak(weeks,deptKey,'ep',weekIdx) : 0;
+  const dpStreakN = r.dp>20 ? countStreak(weeks,deptKey,'dp',weekIdx) : 0;
+
+  function arrowCls(val, reverse=false) {
+    if (Math.abs(val)<1) return 'arr-eq';
+    return (reverse ? val<0 : val>0) ? 'arr-dn' : 'arr-up';
+  }
+  function arrowChar(val) { return Math.abs(val)<1 ? '→' : val>0 ? '↑' : '↓'; }
+
+  if (diff) {
+    items.push(`<div class="cmp-item"><span class="cmp-label">入力率</span><span class="cmp-val">${prev.ir}%→${r.ir}%</span><span class="cmp-arrow ${arrowCls(diff.ir.val)}">${arrowChar(diff.ir.val)}</span>${irStreakN>1?`<span class="cmp-streak">⚠️${irStreakN}週連続</span>`:''}</div>`);
+    items.push(`<div class="cmp-item"><span class="cmp-label">効果度4・5</span><span class="cmp-val">${prev.ep}%→${r.ep}%</span><span class="cmp-arrow ${arrowCls(diff.ep.val,true)}">${arrowChar(diff.ep.val)}</span>${epStreakN>1?`<span class="cmp-streak">⚠️${epStreakN}週連続</span>`:''}</div>`);
+    items.push(`<div class="cmp-item"><span class="cmp-label">難易度4・5</span><span class="cmp-val">${prev.dp}%→${r.dp}%</span><span class="cmp-arrow ${arrowCls(diff.dp.val,true)}">${arrowChar(diff.dp.val)}</span>${dpStreakN>1?`<span class="cmp-streak">⚠️${dpStreakN}週連続</span>`:''}</div>`);
+  }
+  return items.length ? `<div class="cmp-banner">${items.join('')}</div>` : '';
+}
+
+function renderCommentHTML(items) {
+  if (!items.length) return '';
+  return items.map(item => {
+    if (typeof item === 'string') return `<p>${item}</p>`;
+    if (item.diffNotes) {
+      return item.diffNotes.map(n=>`<div class="diff-note ${n.type}">${n.text}</div>`).join('');
+    }
+    if (item.streak) return `<div class="diff-note cont">🔁 ${item.streak}</div>`;
+    return '';
+  }).join('');
+}
+
+function renderCard(dept, r, prev, diff, weeks, deptKey, weekIdx) {
+  const [oi,ol,oc] = r.ov;
+  const good = buildGood(r);
+  const concern = buildConcern(r, diff);
+
+  const streaks = {
+    ir:       r.ir<100           ? countStreak(weeks,deptKey,'ir',weekIdx) : 0,
+    ep:       r.ep>20            ? countStreak(weeks,deptKey,'ep',weekIdx) : 0,
+    dp:       r.dp>20            ? countStreak(weeks,deptKey,'dp',weekIdx) : 0,
+    dist:     r.distBiased.length? countStreak(weeks,deptKey,'distBiased',weekIdx) : 0,
+    e1:       r.e1>=50           ? countStreak(weeks,deptKey,'e1',weekIdx) : 0,
+    braindead:r.braindead.length ? countStreak(weeks,deptKey,'braindead',weekIdx) : 0,
+  };
+
+  const comment = buildComment(r, diff, Object.values(streaks).some(v=>v>1)?streaks:null);
+  const actions = buildActions(r, streaks);
+
+  const barC = r.ir===100?'#16a34a':r.ir>=80?'#d97706':'#dc2626';
+
+  const memberBars = r.members.map(m => {
+    const bc = m.ir===100?'#16a34a':m.ir>=80?'#d97706':'#dc2626';
+    const ptc = m.ir<80?'#dc2626':m.ir<100?'#d97706':'#4ade80';
+    return `<div class="mbar-row"><span class="mbar-name">${m.name}</span><div class="mbar-track"><div class="mbar-fill" style="width:${m.ir}%;background:${bc}"></div></div><span class="mbar-pct" style="color:${ptc}">${m.ir}%</span><span class="mbar-count">${m.filled}/${m.total}件</span></div>`;
+  }).join('');
+
+  const hmRows = r.members.map(m => {
+    const cells = [5,4,3,2,1].map(lv=>effCell(m.effDist[lv])).join('');
+    return `<tr><td class="hn">${m.name}</td><td class="hth">${m.totalH}h</td>${cells}</tr>`;
+  }).join('');
+
+  const cmpBanner = renderCmpBanner(r, prev, diff, weeks, deptKey, weekIdx);
+
+  const diffTagIr = diff ? diffTag(diff.ir.val, false) : '';
+  const diffTagEp = diff ? diffTag(diff.ep.val, true) : '';
+  const diffTagDp = diff ? diffTag(diff.dp.val, true) : '';
+
+  return `<div class="card" id="printTarget">
+<div class="ch"><div><span class="dlabel">DEPT</span><h2 class="dn">${dept}</h2><p class="dm">週次 Growth Cloud レポート · ${currentWeekKey||''}</p></div><div class="chip" style="background:${oc}">${oi} ${ol}</div></div>
+${cmpBanner}
+<div class="sg">
+<div class="mb"><p class="ml">入力率</p><p class="mv" style="color:${ic(r.ir)}">${r.ir}<span class="mu">%</span>${diffTagIr}</p><div class="bb"><div class="bf" style="width:${Math.min(r.ir,100)}%;background:${ic(r.ir)}"></div></div><p class="mc">${r.filled} / ${r.total} タスク</p></div>
+<div class="mb"><p class="ml">効果度 4・5</p><p class="mv" style="color:${pc(r.ep)}">${r.ep}<span class="mu">%</span>${diffTagEp}</p><div class="bb"><div class="bf" style="width:${Math.min(r.ep,100)}%;background:${pc(r.ep)}"></div></div><p class="mc">基準 20%以下が適正</p></div>
+<div class="mb"><p class="ml">難易度 4・5</p><p class="mv" style="color:${pc(r.dp)}">${r.dp}<span class="mu">%</span>${diffTagDp}</p><div class="bb"><div class="bf" style="width:${Math.min(r.dp,100)}%;background:${pc(r.dp)}"></div></div><p class="mc">基準 20%以下が適正</p></div>
+</div>
+<div class="hm-section">
+<div class="hm-header"><span class="hm-title">効果度・難易度の入力状況</span><span class="hm-total" style="color:${barC}">${r.ir}%&nbsp; ${r.filled} / ${r.total} 件設定済み</span></div>
+<div class="hm-overall-bar"><div style="width:${r.ir}%;height:100%;background:${barC};border-radius:3px"></div></div>
+<div class="mbar-list">${memberBars}</div>
+</div>
+<div class="hm-section hm-table-section">
+<div class="hm-title-row"><span class="hm-title">効果度の分布</span><span class="hm-legend">入力工数比 低 <span class="lc" style="background:rgba(230,80,30,0.18)"></span><span class="lc" style="background:rgba(230,80,30,0.42)"></span><span class="lc" style="background:rgba(230,80,30,0.65)"></span><span class="lc" style="background:rgba(230,80,30,0.88)"></span><span class="lc" style="background:rgba(220,38,38,1)"></span> 高</span></div>
+<table class="hm-table"><thead><tr><th class="hn">名前</th><th class="hth">総工数</th><th class="hlv">5</th><th class="hlv">4</th><th class="hlv">3</th><th class="hlv">2</th><th class="hlv">1</th></tr></thead><tbody>${hmRows}</tbody></table>
+</div>
+<div class="tc"><div class="fb good"><p class="bt">✅ 良かった点</p><ul>${good.map(x=>`<li>${x}</li>`).join('')}</ul></div><div class="fb conc"><p class="bt">⚠️ 気になる点</p><ul>${concern.length?concern.map(x=>`<li>${x}</li>`).join(''):'<li class="ok">特になし</li>'}</ul></div></div>
+<div class="cb"><p class="bt">FBコメント</p>${renderCommentHTML(comment)}</div>
+<div class="ab"><p class="bt">改善に向けたアクション</p><ol>${actions.map(a=>`<li>${a}</li>`).join('')}</ol></div>
+</div>`;
+}
+
+// ════════════════════════════════════════
+// APP STATE
+// ════════════════════════════════════════
+let allWeeks = [];   // sorted newest first
+let currentWeekKey = null;
+let currentDept = null;
+
+async function loadWeeks() {
+  allWeeks = (await dbGetAll()).sort((a,b) => b.weekKey.localeCompare(a.weekKey));
+  renderHistStrip();
+  if (allWeeks.length) {
+    currentWeekKey = allWeeks[0].weekKey;
+    document.getElementById('weekBadge').textContent = `📅 ${currentWeekKey}`;
+    document.getElementById('weekBadge').style.display = '';
+    populateDeptSelect();
+    document.getElementById('topDate').textContent = currentWeekKey;
+  }
+}
+
+function renderHistStrip() {
+  const strip = document.getElementById('histStrip');
+  const chips = document.getElementById('histChips');
+  if (!allWeeks.length) { strip.classList.remove('show'); return; }
+  strip.classList.add('show');
+  chips.innerHTML = allWeeks.map(w =>
+    `<span class="hist-chip${w.weekKey===currentWeekKey?' active':''}" onclick="switchWeek('${w.weekKey}')">${w.weekKey}</span>`
+  ).join('');
+}
+
+function populateDeptSelect() {
+  const sel = document.getElementById('sel');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— 部署を選択 —</option>';
+  if (!currentWeekKey) return;
+  const week = allWeeks.find(w=>w.weekKey===currentWeekKey);
+  if (!week) return;
+  const depts = Object.keys(week.results).sort();
+  depts.forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d; opt.textContent = d;
+    if (d === prev) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  if (currentDept && depts.includes(currentDept)) {
+    sel.value = currentDept;
+    showDept(currentDept);
+  }
+}
+
+function switchWeek(key) {
+  currentWeekKey = key;
+  document.getElementById('weekBadge').textContent = `📅 ${key}`;
+  document.getElementById('topDate').textContent = key;
+  renderHistStrip();
+  populateDeptSelect();
+  if (currentDept) showDept(currentDept);
+}
+
+function showDept(dept) {
+  currentDept = dept;
+  document.getElementById('pdfBtn').disabled = !dept || !isOwner;
+  const _jb = document.getElementById('jpegBtn');
+  if (_jb) _jb.disabled = !dept || !isOwner;
+  const wrap = document.getElementById('wrap');
+  if (!dept) {
+    wrap.innerHTML = '<div class="empty"><div class="ico">🏢</div><p>上のプルダウンから部署を選択してください</p></div>';
+    return;
+  }
+  const weekIdx = allWeeks.findIndex(w=>w.weekKey===currentWeekKey);
+  const week = allWeeks[weekIdx];
+  if (!week || !week.results[dept]) {
+    wrap.innerHTML = '<div class="empty"><p>データがありません</p></div>';
+    return;
+  }
+  const r = week.results[dept];
+  const prevWeek = allWeeks[weekIdx+1];
+  const prev = prevWeek?.results[dept] || null;
+  const diff = prev ? calcDiff(r, prev) : null;
+  wrap.innerHTML = renderCard(dept, r, prev, diff, allWeeks, dept, weekIdx);
+}
+
+async function deleteCurrentWeek() {
+  if (!isOwner) { showToast('オーナーログインが必要です'); return; }
+  if (!currentWeekKey) return;
+  if (!confirm(`「${currentWeekKey}」のデータを削除しますか？`)) return;
+  await dbDelete(currentWeekKey);
+  allWeeks = allWeeks.filter(w=>w.weekKey!==currentWeekKey);
+  currentWeekKey = allWeeks[0]?.weekKey || null;
+  renderHistStrip();
+  populateDeptSelect();
+  document.getElementById('wrap').innerHTML = '<div class="empty"><div class="ico">📥</div><p>右上の「CSVインポート」からデータを読み込んでください</p></div>';
+  if (currentWeekKey) document.getElementById('topDate').textContent = currentWeekKey;
+  showToast('削除しました');
+}
+
+// ════════════════════════════════════════
+// OWNER AUTH
+// ════════════════════════════════════════
+function toggleOwnerLogin() {
+  if (isOwner) {
+    isOwner = false;
+    updateOwnerUI();
+    showToast('ログアウトしました');
+  } else {
+    document.getElementById('ownerPanel').classList.add('open');
+    document.getElementById('ownerPw').value = '';
+    document.getElementById('ownerStatus').textContent = '';
+    setTimeout(()=>document.getElementById('ownerPw').focus(), 100);
+  }
+}
+function closeOwnerPanel() {
+  document.getElementById('ownerPanel').classList.remove('open');
+}
+function doOwnerLogin() {
+  const pw = document.getElementById('ownerPw').value;
+  if (pw === OWNER_PASSWORD) {
+    isOwner = true;
+    closeOwnerPanel();
+    updateOwnerUI();
+    showToast('オーナーとしてログインしました');
+  } else {
+    document.getElementById('ownerStatus').className = 'import-status err';
+    document.getElementById('ownerStatus').textContent = '⚠️ パスワードが違います';
+  }
+}
+function updateOwnerUI() {
+  const importBtn = document.getElementById('importBtn');
+  const ownerBtn  = document.getElementById('ownerBtn');
+  const pdfBtn    = document.getElementById('pdfBtn');
+  const delBtn    = document.getElementById('delBtn');
+  if (isOwner) {
+    importBtn.style.display = '';
+    ownerBtn.textContent = '🔓 ログアウト';
+    ownerBtn.style.background = '#16a34a';
+    ownerBtn.style.color = '#fff';
+    if (delBtn) delBtn.style.display = '';
+    if (pdfBtn) pdfBtn.disabled = !currentDept;
+    const jpegBtn = document.getElementById('jpegBtn');
+    if (jpegBtn) jpegBtn.disabled = !currentDept;
+  } else {
+    importBtn.style.display = 'none';
+    ownerBtn.textContent = '🔒 オーナー';
+    ownerBtn.style.background = '';
+    ownerBtn.style.color = '';
+    if (delBtn) delBtn.style.display = 'none';
+    if (pdfBtn) pdfBtn.disabled = true;
+    const jpegBtn = document.getElementById('jpegBtn');
+    if (jpegBtn) jpegBtn.disabled = true;
+  }
+}
+function checkOwnerThenImport() {
+  if (!isOwner) { showToast('オーナーログインが必要です'); return; }
+  openImport();
+}
+// ownerPwのEnterキー対応
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('ownerPanel').classList.contains('open')) doOwnerLogin();
+});
+
+// ════════════════════════════════════════
+// IMPORT FLOW
+// ════════════════════════════════════════
+let parsedRows = null;
+
+function openImport() {
+  document.getElementById('importPanel').classList.add('open');
+  // default to Monday of this week
+  const today = new Date();
+  const mon = new Date(today);
+  mon.setDate(today.getDate() - ((today.getDay()+6)%7));
+  document.getElementById('weekDate').value = mon.toISOString().slice(0,10);
+  document.getElementById('importStatus').textContent = '';
+  document.getElementById('confirmBtn').disabled = true;
+  parsedRows = null;
+}
+
+function closeImport() {
+  document.getElementById('importPanel').classList.remove('open');
+  document.getElementById('fileInput').value = '';
+}
+
+function handleFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const rows = parseCSV(e.target.result);
+    if (!rows || !rows.length) {
+      document.getElementById('importStatus').className = 'import-status err';
+      document.getElementById('importStatus').textContent = '⚠️ CSVの読み込みに失敗しました。列名を確認してください。';
+      document.getElementById('confirmBtn').disabled = true;
+      return;
+    }
+    parsedRows = rows;
+    const depts = [...new Set(rows.map(r=>r.department))].length;
+    document.getElementById('importStatus').className = 'import-status';
+    document.getElementById('importStatus').textContent = `✅ ${rows.length}件・${depts}部署を読み込みました`;
+    document.getElementById('confirmBtn').disabled = false;
+  };
+  reader.readAsText(file, 'utf-8');
+}
+
+async function confirmImport() {
+  if (!parsedRows || !isOwner) return;
+  const weekKey = document.getElementById('weekDate').value;
+  if (!weekKey) { alert('週（日付）を選択してください'); return; }
+  const btn = document.getElementById('confirmBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span>&nbsp;保存中...';
+  try {
+    const results = analyzeRows(parsedRows);
+    await dbPut({weekKey, results, importedAt: new Date().toISOString()});
+    closeImport();
+    await loadWeeks();
+    switchWeek(weekKey);
+    showToast(`「${weekKey}」のデータをインポートしました`);
+  } catch(e) {
+    document.getElementById('importStatus').className = 'import-status err';
+    document.getElementById('importStatus').textContent = '⚠️ 保存失敗: ' + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'インポート実行';
+  }
+}
+
+// Drag & drop
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('dragover'); handleFile(e.dataTransfer.files[0]); });
+
+// ════════════════════════════════════════
+// PDF
+// ════════════════════════════════════════
+async function dlPDF() {
+  const b = document.getElementById('pdfBtn');
+  const t = document.getElementById('printTarget');
+  if (!t || !currentDept) return;
+  b.disabled = true;
+  b.innerHTML = '<span class="spin"></span>&nbsp;生成中...';
+  try {
+    await new Promise(r=>setTimeout(r,120));
+    const cvs = await html2canvas(t,{scale:2.5,useCORS:true,backgroundColor:'#ffffff',logging:false});
+    const {jsPDF} = window.jspdf;
+    const mmW=210, mmH=cvs.height*mmW/cvs.width;
+    const pdf = new jsPDF({orientation:'portrait',unit:'mm',format:mmH>297?[mmW,mmH]:'a4'});
+    const pageH = pdf.internal.pageSize.getHeight();
+    if (mmH<=pageH) {
+      pdf.addImage(cvs.toDataURL('image/png'),'PNG',0,0,mmW,mmH);
+    } else {
+      const pxPerMm=cvs.width/mmW, sliceH=Math.floor(pageH*pxPerMm);
+      let y=0,page=0;
+      while(y<cvs.height){
+        const h=Math.min(sliceH,cvs.height-y);
+        const c2=document.createElement('canvas');
+        c2.width=cvs.width;c2.height=h;
+        c2.getContext('2d').drawImage(cvs,0,y,cvs.width,h,0,0,cvs.width,h);
+        if(page>0) pdf.addPage();
+        pdf.addImage(c2.toDataURL('image/png'),'PNG',0,0,mmW,h/pxPerMm);
+        y+=h;page++;
+      }
+    }
+    pdf.save(`GrowthCloud_${currentDept}_${currentWeekKey}.pdf`);
+  } catch(e) { alert('PDF生成エラー: '+e.message); }
+  finally {
+    b.disabled=false;
+    b.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>PDFダウンロード';
+  }
+}
+
+// ════════════════════════════════════════
+// JPEG DOWNLOAD
+// ════════════════════════════════════════
+async function dlJPEG() {
+  const b = document.getElementById('jpegBtn');
+  const t = document.getElementById('printTarget');
+  if (!t || !currentDept) return;
+  b.disabled = true;
+  b.innerHTML = '<span class="spin"></span>&nbsp;生成中...';
+  try {
+    await new Promise(r=>setTimeout(r,120));
+    const cvs = await html2canvas(t,{scale:2.5,useCORS:true,backgroundColor:'#ffffff',logging:false});
+    const link = document.createElement('a');
+    link.download = `GrowthCloud_${currentDept}_${currentWeekKey}.jpg`;
+    link.href = cvs.toDataURL('image/jpeg', 0.92);
+    link.click();
+  } catch(e) { alert('JPEG生成エラー: '+e.message); }
+  finally {
+    b.disabled = false;
+    b.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>JPEG';
+  }
+}
+
+// ════════════════════════════════════════
+// TOAST
+// ════════════════════════════════════════
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+// ════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════
+loadWeeks();
+</script>
+</body>
+</html>
